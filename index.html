@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport"
+        content="width=device-width, initial-scale=1.0">
+
+  <title>Recuperar palavra-passe | Samsys</title>
+
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      font-family: Arial, sans-serif;
+      background: #f5f7fa;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+
+    .caixa {
+      background: white;
+      padding: 30px;
+      border-radius: 14px;
+      width: 100%;
+      max-width: 400px;
+      border: 1px solid #e5e7eb;
+    }
+
+    h1 {
+      text-align: center;
+      font-size: 30px;
+      margin-bottom: 10px;
+    }
+
+    h2 {
+      text-align: center;
+      font-size: 22px;
+    }
+
+    p {
+      text-align: center;
+      color: #666;
+      line-height: 1.5;
+    }
+
+    label {
+      display: block;
+      margin-top: 20px;
+      margin-bottom: 8px;
+      font-weight: bold;
+    }
+
+    input {
+      width: 100%;
+      padding: 14px;
+      border: 1px solid #ccc;
+      border-radius: 9px;
+      font-size: 16px;
+    }
+
+    button {
+      width: 100%;
+      padding: 15px;
+      margin-top: 25px;
+      background: #111;
+      color: white;
+      border: none;
+      border-radius: 9px;
+      font-size: 16px;
+      font-weight: bold;
+      cursor: pointer;
+    }
+
+    button:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+
+    #mensagem {
+      margin-top: 20px;
+      font-size: 14px;
+    }
+
+    .sucesso {
+      color: #16803c;
+    }
+
+    .erro {
+      color: #b91c1c;
+    }
+  </style>
+</head>
+
+<body>
+  <main class="caixa">
+    <h1>Samsys</h1>
+    <h2>Nova palavra-passe</h2>
+
+    <p>
+      Introduz uma nova palavra-passe
+      para acederes à tua conta.
+    </p>
+
+    <form id="formulario" hidden>
+      <label for="password">
+        Nova palavra-passe
+      </label>
+
+      <input
+        id="password"
+        type="password"
+        minlength="8"
+        autocomplete="new-password"
+        required
+      >
+
+      <label for="confirmar">
+        Confirmar palavra-passe
+      </label>
+
+      <input
+        id="confirmar"
+        type="password"
+        minlength="8"
+        autocomplete="new-password"
+        required
+      >
+
+      <button id="botao" type="submit">
+        Guardar palavra-passe
+      </button>
+    </form>
+
+    <p id="mensagem">
+      A preparar a recuperação...
+    </p>
+  </main>
+
+  <script type="module">
+    import { createClient } from
+      'https://esm.sh/@supabase/supabase-js@2';
+
+    // Vamos preencher estes valores no próximo passo.
+    const SUPABASE_URL = 'https://inmfmgolyoispmpcadzx.supabase.co/rest/v1/';
+    const SUPABASE_KEY = 'Csb_publishable_dKOVL5pOIR6YXvIu1VGPIA_d-vP31Hy';
+
+    const formulario =
+      document.getElementById('formulario');
+
+    const mensagem =
+      document.getElementById('mensagem');
+
+    const botao =
+      document.getElementById('botao');
+
+    function mostrarMensagem(texto, sucesso = false) {
+      mensagem.textContent = texto;
+      mensagem.className = sucesso
+        ? 'sucesso'
+        : 'erro';
+    }
+
+    async function iniciar() {
+      if (
+        SUPABASE_URL === 'COLOCAR_URL' ||
+        SUPABASE_KEY === 'COLOCAR_PUBLISHABLE_KEY'
+      ) {
+        mostrarMensagem(
+          'A página ainda está a ser configurada.'
+        );
+        return;
+      }
+
+      const supabase = createClient(
+        SUPABASE_URL,
+        SUPABASE_KEY,
+        {
+          auth: {
+            detectSessionInUrl: true,
+            persistSession: false,
+          },
+        }
+      );
+
+      const parametros = new URLSearchParams(
+        window.location.search
+      );
+
+      const erroLink =
+        parametros.get('error_description');
+
+      if (erroLink) {
+        mostrarMensagem(
+          'O link expirou ou é inválido. ' +
+          'Pede um novo email de recuperação.'
+        );
+        return;
+      }
+
+      const { data, error } =
+        await supabase.auth.getSession();
+
+      if (error || !data.session) {
+        mostrarMensagem(
+          'Não foi possível validar o link. ' +
+          'Pede um novo email de recuperação.'
+        );
+        return;
+      }
+
+      formulario.hidden = false;
+      mostrarMensagem('');
+
+      formulario.addEventListener(
+        'submit',
+        async (evento) => {
+          evento.preventDefault();
+
+          const password =
+            document.getElementById('password').value;
+
+          const confirmar =
+            document.getElementById('confirmar').value;
+
+          if (password !== confirmar) {
+            mostrarMensagem(
+              'As palavras-passe não coincidem.'
+            );
+            return;
+          }
+
+          if (password.length < 8) {
+            mostrarMensagem(
+              'A palavra-passe deve ter pelo menos 8 caracteres.'
+            );
+            return;
+          }
+
+          botao.disabled = true;
+
+          try {
+            const { error: erroAlteracao } =
+              await supabase.auth.updateUser({
+                password,
+              });
+
+            if (erroAlteracao) {
+              throw erroAlteracao;
+            }
+
+            formulario.hidden = true;
+
+            mostrarMensagem(
+              'Palavra-passe alterada com sucesso! ' +
+              'Já podes voltar à aplicação Samsys.',
+              true
+            );
+
+            await supabase.auth.signOut();
+          } catch (erro) {
+            mostrarMensagem(
+              'Não foi possível alterar a palavra-passe. ' +
+              'Tenta novamente.'
+            );
+          } finally {
+            botao.disabled = false;
+          }
+        }
+      );
+    }
+
+    iniciar();
+  </script>
+</body>
+</html>
