@@ -147,9 +147,8 @@
       'https://esm.sh/@supabase/supabase-js@2';
 
     // Vamos preencher estes valores no próximo passo.
-    const SUPABASE_URL = 'https://inmfmgolyoispmpcadzx.supabase.co/rest/v1/';
-    const SUPABASE_KEY = 'Csb_publishable_dKOVL5pOIR6YXvIu1VGPIA_d-vP31Hy';
-
+    const SUPABASE_URL = 'https://inmfmgolyoispmpcadzx.supabase.co';
+    const SUPABASE_KEY = 'sb_publishable_dKOVL5pOIR6YXvIu1VGPIA_d-vP31Hy';
     const formulario =
       document.getElementById('formulario');
 
@@ -203,16 +202,60 @@
         return;
       }
 
-      const { data, error } =
-        await supabase.auth.getSession();
+const hash = new URLSearchParams(
+  window.location.hash.substring(1)
+);
 
-      if (error || !data.session) {
-        mostrarMensagem(
-          'Não foi possível validar o link. ' +
-          'Pede um novo email de recuperação.'
-        );
-        return;
-      }
+const codigo = parametros.get('code');
+const tokenHash = parametros.get('token_hash');
+const tipo = parametros.get('type');
+
+let sessaoValida = false;
+
+if (codigo) {
+  const { error } =
+    await supabase.auth.exchangeCodeForSession(codigo);
+
+  if (error) {
+    console.error('Erro ao validar código:', error);
+  } else {
+    sessaoValida = true;
+  }
+} else if (tokenHash && tipo === 'recovery') {
+  const { error } = await supabase.auth.verifyOtp({
+    token_hash: tokenHash,
+    type: 'recovery',
+  });
+
+  if (error) {
+    console.error('Erro ao validar recuperação:', error);
+  } else {
+    sessaoValida = true;
+  }
+} else {
+  const { data, error } =
+    await supabase.auth.getSession();
+
+  sessaoValida = !error && Boolean(data.session);
+
+  if (!sessaoValida && hash.get('access_token')) {
+    const { error: erroSessao } =
+      await supabase.auth.setSession({
+        access_token: hash.get('access_token'),
+        refresh_token: hash.get('refresh_token'),
+      });
+
+    sessaoValida = !erroSessao;
+  }
+}
+
+if (!sessaoValida) {
+  mostrarMensagem(
+    'Não foi possível validar o link. ' +
+    'Pede um novo email de recuperação.'
+  );
+  return;
+}
 
       formulario.hidden = false;
       mostrarMensagem('');
